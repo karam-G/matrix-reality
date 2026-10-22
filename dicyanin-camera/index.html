@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080713">
+<title>VIOLET — Live Camera Filter</title>
+<style>
+:root{color-scheme:dark;--bg:#080713;--panel:#121025;--line:#30284d;--violet:#a98bff;--cyan:#78f4ff;--muted:#aaa4c5}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:var(--bg);color:#f7f4ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{height:100dvh;display:flex;flex-direction:column;max-width:900px;margin:auto}.top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px}.brand{font-weight:900;letter-spacing:.2em;font-size:17px}.brand span{color:var(--violet)}.status{font-size:10px;color:var(--cyan);letter-spacing:.12em}.stage{position:relative;flex:1;min-height:0;background:#030208;overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}video,canvas{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}video{display:none}canvas{image-rendering:auto}.scan{pointer-events:none;position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0px,transparent 3px,rgba(160,120,255,.035) 4px);mix-blend-mode:screen}.corners{position:absolute;inset:14px;pointer-events:none;border:1px solid #b7a0ff26}.corners:before,.corners:after{content:"";position:absolute;width:20px;height:20px;border-color:var(--violet);border-style:solid}.corners:before{top:-1px;left:-1px;border-width:2px 0 0 2px}.corners:after{right:-1px;bottom:-1px;border-width:0 2px 2px 0}.readout{position:absolute;left:26px;top:26px;font:10px ui-monospace,monospace;color:#c8bdff;text-shadow:0 1px 5px #000;line-height:1.7}.bottom{padding:16px 18px calc(14px + env(safe-area-inset-bottom));background:var(--bg);max-height:48%;overflow:auto}.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:15px}.mode{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:#c9c2e5;padding:11px 3px;font-size:11px;font-weight:700}.mode.active{border-color:var(--violet);background:#241b43;color:#fff;box-shadow:inset 0 0 0 1px #a98bff55}.sliderrow{display:grid;grid-template-columns:76px 1fr 34px;align-items:center;gap:10px;margin:12px 0;font-size:12px;color:var(--muted)}input[type=range]{width:100%;accent-color:var(--violet)}.value{text-align:right;color:#fff;font-variant-numeric:tabular-nums}.actions{display:flex;gap:9px;margin-top:15px}.action{flex:1;border:1px solid var(--line);border-radius:13px;padding:13px 10px;background:#18142b;color:white;font-size:12px;font-weight:800}.action.primary{background:linear-gradient(135deg,#9d7bff,#6554d8);border:0;color:white}.note{font-size:10px;color:#827b9d;line-height:1.45;margin:12px 2px 0}.error{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;color:#c8c0e6;font-size:13px;line-height:1.6;background:#080713}.error button{margin-top:14px}.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand">VIOLET<span>/</span>VISION</div><div class="status" id="status">CAMERA STANDBY</div></header>
+<main class="stage" id="stage">
+<video id="video" autoplay playsinline muted></video><canvas id="view"></canvas><div class="scan"></div><div class="corners"></div>
+<div class="readout" id="readout">OPTICAL STUDY / 01<br>FILTER: VIOLET<br>PROCESS: LIVE</div>
+<div class="error" id="error"><div><strong>LIVE OPTICAL FILTER</strong><br><br>Start the camera to see a live, dicyanin-inspired color transformation.<br><button class="action primary" id="start">ENABLE CAMERA</button><br><span style="font-size:10px;color:#827b9d">Camera access is requested by Safari. Video stays on this device.</span></div></div>
+</main>
+<section class="bottom">
+<div class="modes" id="modes">
+<button class="mode active" data-mode="violet">VIOLET</button><button class="mode" data-mode="cyan">CYAN SHIFT</button><button class="mode" data-mode="contrast">CONTRAST</button><button class="mode" data-mode="edges">EDGE MAP</button>
+</div>
+<label class="sliderrow">INTENSITY<input id="intensity" type="range" min="0" max="100" value="72"><span class="value" id="intensityVal">72%</span></label>
+<label class="sliderrow">CONTRAST<input id="contrast" type="range" min="50" max="200" value="115"><span class="value" id="contrastVal">115%</span></label>
+<label class="sliderrow">BRIGHTNESS<input id="brightness" type="range" min="50" max="160" value="100"><span class="value" id="brightnessVal">100%</span></label>
+<div class="actions"><button class="action" id="flip">FLIP CAMERA</button><button class="action" id="snapshot">CAPTURE FRAME</button><button class="action primary" id="full">FULL SCREEN</button></div>
+<p class="note">A real-time digital color-filter experiment, not a verified reproduction of historical dicyanin glass. It cannot reveal invisible fields or information the camera sensor does not capture. For safe viewing, this app uses no flash or laser.</p>
+</section>
+</div>
+<script>
+(()=> {
+const video=document.getElementById('video'),canvas=document.getElementById('view'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+const errorBox=document.getElementById('error'),status=document.getElementById('status'),readout=document.getElementById('readout');
+const intensity=document.getElementById('intensity'),contrast=document.getElementById('contrast'),brightness=document.getElementById('brightness');
+let stream=null,facing='environment',mode='violet',running=false,lastW=0,lastH=0,frame=0;
+function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,1.5);const w=Math.max(1,Math.floor(r.width*d)),h=Math.max(1,Math.floor(r.height*d));if(w!==canvas.width||h!==canvas.height){canvas.width=w;canvas.height=h;lastW=w;lastH=h}}
+function updateLabels(){document.getElementById('intensityVal').textContent=intensity.value+'%';document.getElementById('contrastVal').textContent=contrast.value+'%';document.getElementById('brightnessVal').textContent=brightness.value+'%'}
+[intensity,contrast,brightness].forEach(e=>e.addEventListener('input',updateLabels));
+async function startCamera(){try{if(stream)stream.getTracks().forEach(t=>t.stop());status.textContent='REQUESTING CAMERA';stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720}}});video.srcObject=stream;await video.play();errorBox.classList.add('hidden');status.textContent='LIVE • ON DEVICE';running=true;resize();requestAnimationFrame(draw)}catch(e){status.textContent='CAMERA BLOCKED';errorBox.classList.remove('hidden');errorBox.querySelector('div').innerHTML='<strong>CAMERA COULD NOT START</strong><br><br>Open this page in Safari over HTTPS, allow camera access in the address-bar/site settings, then retry.<br><button class="action primary" id="retry">TRY AGAIN</button><br><span style="font-size:10px;color:#827b9d">'+String(e&&e.message||e).replace(/[<>]/g,'')+'</span>';document.getElementById('retry').onclick=startCamera}}
+function draw(){if(!running)return;requestAnimationFrame(draw);if(video.readyState<2)return;resize();const w=canvas.width,h=canvas.height;try{ctx.save();ctx.clearRect(0,0,w,h);const vw=video.videoWidth,vh=video.videoHeight,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;ctx.translate(w/2,h/2);if(facing==='user')ctx.scale(-1,1);ctx.drawImage(video,-dw/2,-dh/2,dw,dh);ctx.restore();const img=ctx.getImageData(0,0,w,h),p=img.data,k=Number(contrast.value)/100,b=Number(brightness.value)/100,a=Number(intensity.value)/100;
+if(mode==='edges'){const src=new Uint8ClampedArray(p);for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;const lum=(j)=>src[j]*.299+src[j+1]*.587+src[j+2]*.114;const gx=lum(i-w*4+4)-lum(i-w*4-4)+2*(lum(i+4)-lum(i-4))+lum(i+w*4+4)-lum(i+w*4-4);const gy=lum(i-w*4-4)+2*lum(i-w*4)+lum(i-w*4+4)-lum(i+w*4-4)-2*lum(i+w*4)-lum(i+w*4+4);const edge=Math.min(255,Math.sqrt(gx*gx+gy*gy)*.8);p[i]=edge*.42;p[i+1]=edge*.26;p[i+2]=Math.min(255,edge*1.3+18);p[i+3]=255}}
+else{for(let i=0;i<p.length;i+=4){let r=p[i]/255,g=p[i+1]/255,bl=p[i+2]/255;r=Math.max(0,Math.min(1,(r-.5)*k+.5));g=Math.max(0,Math.min(1,(g-.5)*k+.5));bl=Math.max(0,Math.min(1,(bl-.5)*k+.5));r*=b;g*=b;bl*=b;let nr,ng,nb;if(mode==='cyan'){nr=r*(1-a*.45)+bl*a*.25;ng=g*(1-a*.1)+bl*a*.25;nb=bl*(1-a)+r*a*.8+g*a*.15}else if(mode==='contrast'){nr=r;ng=g;nb=bl}else{nr=r*(1-a*.48)+bl*a*.62;ng=g*(1-a*.62)+r*a*.15+bl*a*.42;nb=bl*(1-a*.1)+r*a*.35+g*a*.08}p[i]=Math.min(255,nr*255);p[i+1]=Math.min(255,ng*255);p[i+2]=Math.min(255,nb*255)}}ctx.putImageData(img,0,0);frame++;if(frame%45===0)readout.innerHTML='OPTICAL STUDY / 01<br>FILTER: '+mode.toUpperCase()+'<br>PROCESS: LIVE • '+w+'×'+h}catch(e){status.textContent='PROCESSING ERROR';console.error(e)}}
+document.getElementById('start').onclick=startCamera;
+document.querySelectorAll('.mode').forEach(btn=>btn.addEventListener('click',()=>{mode=btn.dataset.mode;document.querySelectorAll('.mode').forEach(b=>b.classList.toggle('active',b===btn));readout.innerHTML='OPTICAL STUDY / 01<br>FILTER: '+mode.toUpperCase()+'<br>PROCESS: LIVE'}));
+document.getElementById('flip').onclick=()=>{facing=facing==='environment'?'user':'environment';if(stream)startCamera()};
+document.getElementById('snapshot').onclick=()=>{if(!canvas.width)return;const a=document.createElement('a');a.download='violet-vision-'+new Date().toISOString().replace(/[:.]/g,'-')+'.png';a.href=canvas.toDataURL('image/png');a.click()};
+document.getElementById('full').onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen?.();else await document.exitFullscreen?.()}catch(e){status.textContent='USE SAFARI FULL-SCREEN VIEW'}};
+window.addEventListener('resize',resize);window.addEventListener('pagehide',()=>{running=false;if(stream)stream.getTracks().forEach(t=>t.stop())});
+if(!navigator.mediaDevices?.getUserMedia){errorBox.querySelector('div').innerHTML='<strong>SAFARI CAMERA REQUIRED</strong><br><br>Open this page in Safari over HTTPS on your iPhone.'}
+})();
+</script>
+</body>
+</html>
